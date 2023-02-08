@@ -1,0 +1,5 @@
+COMMANDS
+--------
+exit: save database to temp file and close.
+savedb [filename]: save database to file. If no filename is provided,
+ the original file will be overwritten.

@@ -1,0 +1,195 @@
+<!DOCTYPE HTML>
+<html>
+    <head>
+        <title>Test!</title>
+    </head>
+    <body style= "background-color: beige">
+        <input type ="file" accept="image/jpeg, image/jpg, image/png" name="image" id="fileInput"><br>
+        or<br>
+        <input type ="text" placeholder="Paste URL" id="urlInput"><br>
+        <button onclick = "postImageAndMetadata()" disabled=true id="sendButton">Send!</button><br>
+        <button onclick = "setIdentify()" id = "identifyButton">Identify</button>
+        <button onclick = "setAdd()" id = "addButton">Add</button><br>
+        <input type = "text" placeholder="Title" id = "titleInput" disabled = true><br>
+        <input type = "text" placeholder="Artist" id = "artistInput" disabled = true><br>
+        <p id = "statusText">Waiting for input.</p>
+    </body>
+    
+    <script>
+        const STANDARD_X = 500
+        const STANDARD_Y = 500
+        
+        var fileInput = document.getElementById("fileInput")
+        var urlInput = document.getElementById("urlInput")
+        var sendButton = document.getElementById("sendButton")
+        var identifyButton = document.getElementById("identifyButton")
+        var addButton = document.getElementById("addButton")
+        var titleInput = document.getElementById("titleInput")
+        var artistInput = document.getElementById("artistInput")
+        
+        var statusText = document.getElementById("statusText")
+        
+        var requestType = "IDENTIFY"
+        var dataType = ""
+        
+        var postCheckInterval
+        
+        var canvas = document.createElement("canvas")
+        canvas.width = STANDARD_X;
+        canvas.height = STANDARD_Y;
+        var ctx = canvas.getContext('2d');
+        
+        //Send any image chosen by the user to the invisible canvas.
+        fileInput.onchange = function(e){
+            document.getElementById("sendButton").disabled = false
+            
+            var img = new Image();
+            img.onload = draw;
+            //img.onError = failed;
+            if(this.files[0]){
+                img.src = URL.createObjectURL(this.files[0]);
+                urlInput.disabled = true
+                sendButton.disabled = false
+                dataType = "IMG_DATA"
+            }
+            else{
+                urlInput.disabled = false
+            }
+            
+        };
+        
+        urlInput.onchange = function(e){
+            if (urlInput.value == ""){
+                fileInput.disabled = false
+            }
+            else{
+                fileInput.disabled = true
+                sendButton.disabled = false
+                dataType = "URL"
+            }
+        }
+        
+        function setIdentify(){
+            identifyButton.setAttribute("style", "border: 3px solid #0033BB")
+            addButton.setAttribute("style", "border: 3px solid beige")
+            requestType = "IDENTIFY"
+            titleInput.value = ""
+            artistInput.value = ""
+            titleInput.disabled = true
+            artistInput.disabled = true
+        }
+        
+        function setAdd(){
+            identifyButton.setAttribute("style", "border: 3px solid beige")
+            addButton.setAttribute("style", "border: 3px solid #0033BB")
+            requestType = "ADD"
+            titleInput.disabled = false
+            artistInput.disabled = false
+        }
+        
+        function draw(){
+            ctx.drawImage(this, 0, 0, STANDARD_X, STANDARD_Y)
+        }
+        
+        function sendString(data){
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("POST", "test.html", true)
+            xhttp.send(data + "!!!")
+            console.log(xhttp.response)
+        }
+        
+        function postImageAndMetadata(){
+            if (requestType == "ADD"){
+                if(titleInput.value == "" || artistInput.value == ""){
+                    statusText.innerHTML = "Title and Artist required for add. Try again."
+                    return
+                }
+            }
+            
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("GET", "newid", true)
+            xhttp.send()
+            
+            xhttp.onreadystatechange = function(){
+                if (this.readyState == 4){
+                    if(this.status == 200){
+                        var postid = this.responseText
+                        processAndSend(postid)
+                        postCheckInterval = setInterval(checkForPostResponse, 2000, postid)
+                        
+                    }
+                    else{
+                        return -1
+                    }
+                }
+            }
+            
+            if (xhttp.status == 200){
+                return xhttp.responseText
+            }
+            else{
+                return -1
+            }
+        }
+        
+        function logPostID(){
+            console.log(getPostID())
+        }
+        
+        function checkForPostResponse(postid){
+            var xhttp = new XMLHttpRequest()
+            xhttp.open("GET", ("id" + postid), true)
+            xhttp.send()
+            
+            statusText.innerHTML = statusText.innerHTML.concat(".")
+            
+            xhttp.onreadystatechange = function(){
+                if (xhttp.status == 200){
+                    console.log(xhttp.responseText)
+                    statusText.innerHTML = "Server Response:\n" + xhttp.responseText
+                    clearInterval(postCheckInterval)
+                }
+                else if (xhttp.status == 404){
+                    console.log("Result not yet available.")
+                }
+            }
+            
+        }
+
+        function processAndSend(postid){
+            var dat = ctx.getImageData(0,0,STANDARD_X,STANDARD_Y)
+            var datString = "";
+            
+            if (dataType == "IMG_DATA"){
+                for (var i = 0; i < dat.data.length; i += 4){
+                    datString = datString.concat(dat.data[i].toString(), ",", dat.data[i+1].toString(),",", dat.data[i+2].toString(),"%")
+                }
+            }
+            else{
+                datString = urlInput.value
+                console.log(urlInput.value)
+            }
+            
+            var metadata = "METADATA:\n"
+            metadata = metadata.concat("REQUEST_TYPE " + requestType + "\n")
+            metadata = metadata.concat("DATA_TYPE " + dataType + "\n")
+            metadata = metadata.concat("WIDTH " + STANDARD_X.toString() + "\n" + "HEIGHT " + STANDARD_Y.toString() + "\n")
+            if(requestType == "ADD"){
+                metadata = metadata.concat("TITLE " + titleInput.value + "\n")
+                metadata = metadata.concat("ARTIST " + artistInput.value + "\n")
+            }
+            if(dataType == "URL"){
+                metadata = metadata.concat("URL " + urlInput.value + "\n")
+            }
+            metadata = metadata.concat("REQUEST_ID " + postid + "\n%")
+            
+            sendString(metadata.concat(datString))
+            
+            statusText.innerHTML = "Waiting for response."
+            
+        }
+        
+        setIdentify()
+    </script>
+    
+</html>
